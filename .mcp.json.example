@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ajera": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["server.py"],
+      "env": {
+        "AJERA_API_URL": "https://ajera.com/VXXXXXX/AjeraAPI.ashx?id=XXXXXXXX",
+        "AJERA_USERNAME": "your_api_username",
+        "AJERA_PASSWORD": "your_api_password"
+      }
+    }
+  }
+}
