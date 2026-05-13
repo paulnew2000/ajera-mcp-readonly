@@ -188,7 +188,7 @@ def get_projects_with_resources(
     records enriched with resource assignment information.
 
     Note: exact argument keys and response shape for this method are unverified
-    against instance V007667. Inspect raw output and update
+    against instance your Ajera instance. Inspect raw output and update
     API_CAPABILITY_INVENTORY.md with confirmed field names.
 
     Args:
@@ -738,7 +738,7 @@ def list_vendor_invoices(
     Use get_vendor_invoice to retrieve full line-item detail.
 
     Note: filter argument keys for this method are unverified against instance
-    V007667. If results are unexpected, inspect raw output and update
+    your Ajera instance. If results are unexpected, inspect raw output and update
     API_CAPABILITY_INVENTORY.md with confirmed field names.
 
     Args:
@@ -769,7 +769,7 @@ def get_vendor_invoice(vendor_invoice_keys: list[int]) -> str:
     Returns line items, amounts, approval status, and payment information.
 
     Note: the argument key ('RequestedVendorInvoices') is unverified against
-    instance V007667. Update API_CAPABILITY_INVENTORY.md if a different key
+    instance your Ajera instance. Update API_CAPABILITY_INVENTORY.md if a different key
     is required.
 
     Args:
