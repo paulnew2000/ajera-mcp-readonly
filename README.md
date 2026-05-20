@@ -16,6 +16,9 @@ Once connected, you can ask your AI assistant things like:
 - *"List all active vendors with unpaid invoices."*
 - *"What GL accounts are in the Expense account group?"*
 - *"Give me full details on employees in the Austin department."*
+- *"List all active projects and their billing type and total contract amount."*
+- *"Who is the project manager on job 4210.000?"*
+- *"Which active projects are billed as Fixed Fee and have a total contract over $500,000?"*
 
 ---
 
@@ -158,6 +161,8 @@ Expected output: 24 new endpoints passing with record counts and sample data.
 - **`ListChargeablePhases` requires a project key** — call once per project.
 - **GL transaction detail is not available** — only balance snapshots via `GetGLAccounts`.
 - **No write operations** — this server is intentionally read-only.
+- **`ProjectManager` on project records is a nested dict**, not a plain string — shape is `{"EmployeeKey": int, "FirstName": str, "MiddleName": str, "LastName": str}`. Extract name as `FirstName + " " + LastName`.
+- **`GetProjects` batch size** — tested safely at 25 keys per call across a full production set (~1,146 active projects) with zero errors. Larger batches are untested; stay at ≤25 for bulk operations.
 
 ---
 

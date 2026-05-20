@@ -76,7 +76,11 @@ def list_projects(
 ) -> str:
     """
     Search for projects and return summary information (ProjectKey, ID,
-    Description, Status). Use get_project to retrieve full details.
+    Description, Status). Use get_project to retrieve full details including
+    BillingType, TotalContractAmount, DepartmentDescription, ProjectManager,
+    phases, and contacts.
+
+    Production scale: ~1,146 active projects as of May 2026.
 
     Args:
         status: Filter by status — 'Active', 'Inactive', or '' for all.
@@ -99,8 +103,24 @@ def list_projects(
 def get_project(project_keys: list[int]) -> str:
     """
     Retrieve full details for one or more projects by their ProjectKey values.
-    Returns all project fields including phases, invoice groups, contacts,
-    budgets, and custom fields.
+
+    Confirmed top-level fields (verified against production instance, ~1,146 active projects):
+        ProjectKey          — integer primary key
+        ID                  — human-readable job number (e.g. "4210.000")
+        Description         — project name/title
+        Status              — e.g. "Active", "Inactive"
+        BillingType         — e.g. "TimeAndMaterials", "FixedFee", "CostPlus"
+        TotalContractAmount — total contract value (float)
+        DepartmentDescription — department name string
+        ProjectManager      — nested dict: {EmployeeKey, FirstName, MiddleName, LastName}
+                              NOT a plain string — extract name as FirstName + LastName
+        InvoiceGroups       — list of invoice group objects
+        Contacts            — list of associated contact objects
+
+    Also returns phases, budgets, dates, billing configuration, and custom fields.
+
+    Batching: tested safely at 25 keys per call across all 1,146 active projects
+    with zero errors. Larger batches may work but are untested.
 
     Args:
         project_keys: List of integer ProjectKey values (e.g. [1001, 1002]).
