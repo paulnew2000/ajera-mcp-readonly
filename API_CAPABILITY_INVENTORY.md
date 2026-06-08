@@ -132,6 +132,7 @@ API Settings permission screen. Columns:
 
 > ⚠️ `GetEmployees` requires a **v1** session even when the rest of the server uses v2.
 > ⚠️ `ListEmployees` does not return the `Email` field — use `GetEmployees` for email.
+> ℹ️ `GetEmployee` (singular, no "s") does not exist. Behavior when called varies by instance — some return `"Unauthorized method: GetEmployee"`; others return `ResponseCode: 200` with empty `Content` and no error. Either way, always use `GetEmployees` (plural).
 
 ---
 
@@ -276,16 +277,16 @@ API Settings permission screen. Columns:
 
 | Method | Type | Content Key | v2 | MCP v2 | Notes |
 |---|---|---|---|---|---|
-| `ListTimesheets` | Read | `Timesheets` | **Yes** | ✓ | 500-record cap per call; fetch week by week to avoid silent truncation |
+| `ListTimesheets` | Read | `Timesheets` | **Yes** | ✓ | 500-record cap per call — confirmed intentional; fetch week by week |
 | `GetTimesheets` | Read | `Timesheets` | **Yes** | ✓ | `RequestedTimesheets: [int...]` |
 | `ListTimesheetNonWorkDays` | Read | `NonWorkDays` | **Yes** | ✓ | Holidays and non-work days; filter by date range |
-| `CreateTimesheet` | Write | — | Yes | — | Write method — not covered by this server |
-| `UpdateTimesheets` | Write | — | Yes | — | Write method — not covered by this server |
+| `CreateTimesheet` | Write | — | Yes | — | Write method — not covered by this server. Payload must nest under `{"Timesheet": {"EmployeeKey": ..., "TimesheetDate": "..."}}` |
+| `UpdateTimesheets` | Write | — | Yes | — | Write method — not covered by this server. **Row-level field names use spaces, not camelCase** (e.g. `"Project Key"`, `"Phase Key"`, `"Activity Key"`, `"D1 Regular"`, `"Timesheet Overhead Group Detail Key"`). `UnchangedData` (full record from GetTimesheets) goes inside the timesheet object alongside `UpdatedProjects`/`UpdatedOverheads`. |
 | `SubmitTimesheets` | Write | — | Yes | — | Write method — not covered by this server |
 | `EndTimesheetSessions` | Write | — | Yes | — | Write method — not covered by this server |
 
 > ⚠️ All timesheet methods require a **v2** session token.
-> ⚠️ `ListTimesheets` has a hard 500-record cap — silently drops overflow. Use 7-day date windows.
+> ⚠️ `ListTimesheets` has a hard 500-record cap — **confirmed intentional** (shared code with the Manage Timesheets UI; not a silent bug). Deltek has entered a request to add a truncation warning to API responses. To decouple the API limit from the UI limit, submit an enhancement request to the [Ajera Ideas Portal](https://ideas.deltek.com/). Use 7-day date windows to stay within the cap.
 > ⚠️ Filter names: `FilterByEarliestTimesheetDate` / `FilterByLatestTimesheetDate` (not `FilterByEarliestDate`).
 > ⚠️ Approval fields (`Submitted`, `Supervisor Approved`, `Accounting Approved`) are absent on unactioned records — treat absence as false.
 

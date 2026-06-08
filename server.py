@@ -453,8 +453,10 @@ def list_timesheets(
     Search for timesheets and return summary information. Use get_timesheet to
     retrieve the full timesheet with daily hour entries.
 
-    Hard limit: 500 records per call — silently truncates. For organizations
-    with many employees, use date windows of 7 days or fewer to avoid overflow.
+    Hard limit: 500 records per call — confirmed intentional (the API shares
+    code with the Manage Timesheets UI, which has the same cap). Deltek has
+    a request in to add a truncation warning to the API response. For
+    organizations with many employees, use date windows of 7 days or fewer.
 
     Args:
         employee_keys: Only return timesheets for these EmployeeKey values.

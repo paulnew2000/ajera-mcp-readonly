@@ -360,6 +360,9 @@ class AjeraClient:
         earliest_date: str | None = None,
         latest_date: str | None = None,
     ) -> list[dict]:
+        # Hard cap of 500 records per call — confirmed intentional by Deltek
+        # (shared server-side code with the Manage Timesheets UI).
+        # Use narrow date windows (≤7 days) to stay within the limit.
         args: dict[str, Any] = {}
         if employee_keys:
             args["FilterByEmployee"] = employee_keys
