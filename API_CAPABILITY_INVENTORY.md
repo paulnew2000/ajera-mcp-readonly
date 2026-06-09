@@ -1,10 +1,11 @@
 # Ajera API Capability Inventory
 
-Complete map of every method exposed by the Deltek Ajera API, based on the
-API Settings permission screen. Columns:
+Map of every **read** method exposed by the Deltek Ajera API, based on the
+API Settings permission screen. This inventory is **read-only by design** —
+write methods are intentionally excluded. Columns:
 
 - **Method** — exact name sent in the `Method` field of the JSON payload
-- **Type** — Read or Write
+- **Type** — Read (this inventory covers read methods only)
 - **Content Key** — top-level key in `Content` that holds the result array
 - **v2 Required** — whether this method requires a v2 session token
 - **MCP v2** — implemented in the read-only v2 MCP server
@@ -60,7 +61,6 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListClients` | Read | `Clients` | No | ✓ | Filters: `FilterByStatus`, `FilterByNameLike`, `FilterByCompany`, `FilterByClientType`, date range |
 | `GetClients` | Read | `Clients` | No | ✓ | `RequestedClients: [int...]`; returns full record including Contacts[] array |
-| `UpdateClients` | Write | — | No | — | Requires `UpdatedClients` + `UnchangedClients` for concurrency; links contacts via Contacts[] not ContactClientKey |
 
 ---
 
@@ -86,7 +86,6 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListContacts` | Read | `Contacts` | No | ✓ | Filters: `FilterByStatus`, `FilterByNameLike`, `FilterByClient` |
 | `GetContacts` | Read | `Contacts` | No | ✓ | `RequestedContacts: [int...]` |
-| `UpdateContacts` | Write | — | No | — | Create with `ContactKey: -1`; one new contact per call; global name uniqueness enforced |
 
 ---
 
@@ -128,7 +127,6 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListEmployees` | Read | `Employees` | No | ✓ | Returns summary only — does NOT include Email field |
 | `GetEmployees` | Read | `Employees` | **v1 only** | ✓ | `RequestedEmployees: [int...]`; batch ≤50 keys per call — larger batches return RC=-100; includes Email |
-| `UpdateEmployees` | Write | — | No | — | Write method — not covered by this server |
 
 > ⚠️ `GetEmployees` requires a **v1** session even when the rest of the server uses v2.
 > ⚠️ `ListEmployees` does not return the `Email` field — use `GetEmployees` for email.
@@ -143,8 +141,6 @@ API Settings permission screen. Columns:
 | `ListExpenseReports` | Read | `ExpenseReports` | No | ✓ | API user sees **only its own** reports — not all users' |
 | `GetExpenseReports` | Read | `ExpenseReports` | No | ✓ | `RequestedExpenseReports: [int...]` |
 | `DownloadExpenseReports` | Read | *(file blob)* | No | ✓ | `FileKey: int`; returns base64 file data |
-| `UpdateExpenseReports` | Write | — | No | — | Write method — not covered by this server |
-| `UploadExpenseReports` | Write | — | No | — | Write method — not covered by this server |
 
 > ⚠️ Expense report access is scoped to the API user — ODBC required for cross-user access.
 
@@ -251,8 +247,6 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListProjects` | Read | `Projects` | No | ✓ | Filters: `FilterByStatus`, `FilterByNameLike`, `FilterByCompany`, `FilterByProjectType`, date range |
 | `GetProjects` | Read | `Projects` | No | ✓ | `RequestedProjects: [int...]`; returns full project including phases |
-| `CreateProjects` | Write | — | No | — | Write method — not covered by this server |
-| `UpdateProjects` | Write | — | No | — | Write method — not covered by this server |
 
 ---
 
@@ -261,7 +255,6 @@ API Settings permission screen. Columns:
 | Method | Type | Content Key | v2 | MCP v2 | Notes |
 |---|---|---|---|---|---|
 | `GetProjectsWithResources` | Read | `Projects` | No | ✓ | Use `RequestedProjects: [int...]`. Returns full project record + Resources[] array per phase. Response shape identical to GetProjects with Resources array added. |
-| `UpdateProjectsWithResources` | Write | — | No | — | Write method — not covered by this server |
 
 ---
 
@@ -280,10 +273,6 @@ API Settings permission screen. Columns:
 | `ListTimesheets` | Read | `Timesheets` | **Yes** | ✓ | 500-record cap per call — confirmed intentional; fetch week by week |
 | `GetTimesheets` | Read | `Timesheets` | **Yes** | ✓ | `RequestedTimesheets: [int...]` |
 | `ListTimesheetNonWorkDays` | Read | `NonWorkDays` | **Yes** | ✓ | Holidays and non-work days; filter by date range |
-| `CreateTimesheet` | Write | — | Yes | — | Write method — not covered by this server. Payload must nest under `{"Timesheet": {"EmployeeKey": ..., "TimesheetDate": "..."}}` |
-| `UpdateTimesheets` | Write | — | Yes | — | Write method — not covered by this server. **Row-level field names use spaces, not camelCase** (e.g. `"Project Key"`, `"Phase Key"`, `"Activity Key"`, `"D1 Regular"`, `"Timesheet Overhead Group Detail Key"`). `UnchangedData` (full record from GetTimesheets) goes inside the timesheet object alongside `UpdatedProjects`/`UpdatedOverheads`. |
-| `SubmitTimesheets` | Write | — | Yes | — | Write method — not covered by this server |
-| `EndTimesheetSessions` | Write | — | Yes | — | Write method — not covered by this server |
 
 > ⚠️ All timesheet methods require a **v2** session token.
 > ⚠️ `ListTimesheets` has a hard 500-record cap — **confirmed intentional** (shared code with the Manage Timesheets UI; not a silent bug). Deltek has entered a request to add a truncation warning to API responses. To decouple the API limit from the UI limit, submit an enhancement request to the [Ajera Ideas Portal](https://ideas.deltek.com/). Use 7-day date windows to stay within the cap.
@@ -298,11 +287,7 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListVendorInvoices` | Read | `VendorInvoices` | **Yes** | ✓ | Requires v2 session. Filters: vendor keys, date range, status |
 | `GetVendorInvoices` | Read | `VendorInvoices` | **Yes** | ✓ | Requires v2 session. `RequestedVendorInvoices: [int...]` |
-| `CreateVendorInvoices` | Write | — | No | — | Write method — not covered by this server |
-| `DeleteVendorInvoices` | Write | — | No | — | Write method — not covered by this server |
 | `DownloadVendorInvoices` | Read | *(file)* | No | — | Read permission not tested |
-| `UploadVendorInvoices` | Write | — | No | — | Write method — not covered by this server |
-| `UpdateVendorInvoices` | Write | — | No | — | Write method — not covered by this server |
 
 > ⚠️ Both `ListVendorInvoices` and `GetVendorInvoices` require a **v2** session token. Calling on v1 returns "Unauthorized method ... for api version 1 but is supported with api version 2".
 
@@ -322,7 +307,6 @@ API Settings permission screen. Columns:
 |---|---|---|---|---|---|
 | `ListVendors` | Read | `Vendors` | No | ✓ | Filters: `FilterByStatus`, `FilterByNameLike`, `FilterByCompany`, `FilterByVendorType`, date range |
 | `GetVendors` | Read | `Vendors` | No | ✓ | `RequestedVendors: [int...]`; note API typo `BuisnessTypeW9` — match exactly when reading |
-| `UpdateVendors` | Write | — | No | — | Write method — strip derived fields before sending |
 
 ---
 
@@ -336,43 +320,43 @@ API Settings permission screen. Columns:
 
 ## Summary Counts
 
-| Category | Read Methods | Write Methods | Read in MCP v2 |
-|---|---|---|---|
-| Account Groups | 1 | 0 | 1 |
-| Activities | 1 | 0 | 1 |
-| Attachment Categories | 1 | 0 | 0 (not tested) |
-| Bank Accounts | 1 | 0 | 1 |
-| Chargeable Phases | 1 | 0 | 1 |
-| Clients | 2 | 1 | 2 |
-| Client Types | 1 | 0 | 1 |
-| Companies | 1 | 0 | 1 |
-| Contacts | 2 | 1 | 2 |
-| Contact Types | 1 | 0 | 1 |
-| Deductions | 1 | 0 | 1 |
-| Departments | 1 | 0 | 1 |
-| Employee Types | 1 | 0 | 1 |
-| Employees | 2 | 1 | 2 |
-| Expense Reports | 3 | 2 | 3 |
-| Fringes | 1 | 0 | 1 |
-| GL Accounts | 2 | 0 | 2 |
-| Invoice Formats | 1 | 0 | 1 |
-| Marketing Final Dispositions | 1 | 0 | 1 |
-| Marketing Stages | 1 | 0 | 1 |
-| Overhead Groups | 1 | 0 | 1 |
-| Payroll Taxes | 1 | 0 | 1 |
-| Pays | 1 | 0 | 1 |
-| Project Templates | 2 | 0 | 2 |
-| Project Totals | 1 | 0 | 1 |
-| Project Types | 1 | 0 | 1 |
-| Projects | 2 | 2 | 2 |
-| Projects With Resources | 1 | 1 | 1 |
-| Rate Tables | 1 | 0 | 1 |
-| Timesheets | 3 | 4 | 3 |
-| Vendor Invoices | 2 | 5 | 2 |
-| Vendor Types | 1 | 0 | 1 |
-| Vendors | 2 | 1 | 2 |
-| Wage Tables | 1 | 0 | 1 |
-| **Total** | **46** | **18** | **46** |
+| Category | Read Methods | Read in MCP v2 |
+|---|---|---|
+| Account Groups | 1 | 1 |
+| Activities | 1 | 1 |
+| Attachment Categories | 1 | 0 (not tested) |
+| Bank Accounts | 1 | 1 |
+| Chargeable Phases | 1 | 1 |
+| Clients | 2 | 2 |
+| Client Types | 1 | 1 |
+| Companies | 1 | 1 |
+| Contacts | 2 | 2 |
+| Contact Types | 1 | 1 |
+| Deductions | 1 | 1 |
+| Departments | 1 | 1 |
+| Employee Types | 1 | 1 |
+| Employees | 2 | 2 |
+| Expense Reports | 3 | 3 |
+| Fringes | 1 | 1 |
+| GL Accounts | 2 | 2 |
+| Invoice Formats | 1 | 1 |
+| Marketing Final Dispositions | 1 | 1 |
+| Marketing Stages | 1 | 1 |
+| Overhead Groups | 1 | 1 |
+| Payroll Taxes | 1 | 1 |
+| Pays | 1 | 1 |
+| Project Templates | 2 | 2 |
+| Project Totals | 1 | 1 |
+| Project Types | 1 | 1 |
+| Projects | 2 | 2 |
+| Projects With Resources | 1 | 1 |
+| Rate Tables | 1 | 1 |
+| Timesheets | 3 | 3 |
+| Vendor Invoices | 2 | 2 |
+| Vendor Types | 1 | 1 |
+| Vendors | 2 | 2 |
+| Wage Tables | 1 | 1 |
+| **Total** | **46** | **46** |
 
 ---
 
