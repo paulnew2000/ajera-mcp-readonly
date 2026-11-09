@@ -3,7 +3,7 @@ Deltek Ajera API HTTP client — read-only.
 
 Version routing:
     v2 only : All timesheet methods (ListTimesheets, GetTimesheets,
-              ListTimesheetNonWorkDays)
+              ListTimesheetNonWorkDays), vendor invoices, journal entries
     v1 only : Everything else, including GetEmployees (see note below)
     both    : ListProjects, GetProjects, ListGLAccounts
 
@@ -16,6 +16,7 @@ lifetime of the AjeraClient instance.
 """
 
 import os
+from datetime import date
 import httpx
 from typing import Any
 
@@ -48,6 +49,8 @@ class AjeraClient:
         "ListTimesheetNonWorkDays",
         "ListVendorInvoices",
         "GetVendorInvoices",
+        "ListJournalEntries",
+        "GetJournalEntries",
     })
 
     # Methods that must use v1 even if a v2 session exists.
@@ -139,7 +142,7 @@ class AjeraClient:
     def close_sessions(self) -> None:
         for token in list(self._sessions.values()):
             try:
-                self._raw_call("CloseAPISession", session_token=token)
+                self._raw_call("EndAPISession", session_token=token)
             except AjeraError:
                 pass
         self._sessions.clear()
@@ -443,6 +446,79 @@ class AjeraClient:
             args["ExcludeCloseYearEntries"] = True
         content = self._call("GetGLAccounts", args or None)
         return content.get("GLAccounts", []) if content else []
+
+    # ------------------------------------------------------------------
+    # Journal Entries  (API v2; read methods only)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_journal_keys(keys: list[int], name: str) -> None:
+        if not isinstance(keys, list) or not keys or any(
+            type(key) is not int or key <= 0 for key in keys
+        ):
+            raise ValueError(f"{name} must be a nonempty list of positive integer keys.")
+
+    def list_journal_entries(
+        self,
+        company_keys: list[int] | None = None,
+        earliest_date: str | None = None,
+        latest_date: str | None = None,
+        basis: str | None = None,
+        voided: bool | None = None,
+    ) -> list[dict]:
+        """List at most 500 headers. Split date windows when the cap is reached."""
+        args: dict[str, Any] = {}
+        if company_keys is not None:
+            self._validate_journal_keys(company_keys, "company_keys")
+            args["FilterByCompany"] = company_keys
+        for name, value, api_name in (
+            ("earliest_date", earliest_date, "FilterByEarliestAccountingDate"),
+            ("latest_date", latest_date, "FilterByLatestAccountingDate"),
+        ):
+            if value is not None:
+                try:
+                    valid = date.fromisoformat(value).isoformat() == value
+                except (TypeError, ValueError):
+                    valid = False
+                if not valid:
+                    raise ValueError(f"{name} must be an ISO date (YYYY-MM-DD).")
+                args[api_name] = value
+        if earliest_date and latest_date and earliest_date > latest_date:
+            raise ValueError("earliest_date must not be later than latest_date.")
+        if basis is not None:
+            if basis not in ("Accrual", "Cash", "Both"):
+                raise ValueError("basis must be Accrual, Cash, Both, or omitted.")
+            args["FilterByBasis"] = basis
+        if voided is not None:
+            if type(voided) is not bool:
+                raise ValueError("voided must be true, false, or omitted.")
+            args["FilterByVoided"] = voided
+        content = self._call("ListJournalEntries", args)
+        return content.get("JournalEntries", []) if content else []
+
+    def get_journal_entries(self, journal_entry_keys: list[int]) -> list[dict]:
+        """Retrieve selected entries; omit opaque write snapshots from read output."""
+        self._validate_journal_keys(journal_entry_keys, "journal_entry_keys")
+        keys = list(dict.fromkeys(journal_entry_keys))
+        results: list[dict] = []
+        # The API sends large opaque snapshots even for empty entries. Keep
+        # each response small; five is a client batch size, not an API limit.
+        for offset in range(0, len(keys), 5):
+            batch = keys[offset:offset + 5]
+            content = self._call("GetJournalEntries", {"RequestedJournalEntries": batch})
+            rows = content.get("JournalEntries", []) if content else []
+            returned = {row.get("JournalEntryKey") for row in rows}
+            if len(rows) != len(batch) or returned != set(batch):
+                raise AjeraError(
+                    "GetJournalEntries returned an incomplete or unexpected set of keys; "
+                    "the response cannot be treated as a complete successful request."
+                )
+            results.extend(
+                {name: value for name, value in row.items()
+                 if name != "UnchangedJournalEntries"}
+                for row in rows
+            )
+        return results
 
     # ------------------------------------------------------------------
     # Expense Reports  (API user sees own reports only)

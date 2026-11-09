@@ -161,8 +161,64 @@ write methods are intentionally excluded. Columns:
 | `ListGLAccounts` | Read | `GLAccounts` | No | ✓ | Filters: `FilterByStatus`, `FilterByAccountGroup`, `FilterByType` |
 | `GetGLAccounts` | Read | `GLAccounts` | No | ✓ | Returns balances; `AsOfDate` uses MM/DD/YYYY format; no transaction-level detail |
 
-> ⚠️ GL transaction detail (individual journal entries) is **not exposed** by the API.
+> GL account methods return balance snapshots. Use the separate v2 Journal Entries methods below for entry headers and posting lines; this does not establish complete coverage of all GL transaction sources.
 > ⚠️ `AsOfDate` format is `MM/DD/YYYY`, not ISO.
+
+---
+
+## Journal Entries
+
+Read contracts verified against Ajera 10.40.01 in November 2026. These are
+empirical findings; availability depends on the installed Ajera version and
+the API user's method permissions. This public inventory documents reads only.
+
+| Method | Type | Content Key | v2 | MCP v2 | Notes |
+|---|---|---|---|---|---|
+| `ListJournalEntries` | Read | `JournalEntries` | Yes | ✓ | Tool: `list_journal_entries`. Space-separated header fields; at most 500 entries before pagination. |
+| `GetJournalEntries` | Read | `JournalEntries` | Yes | ✓ | Tool: `get_journal_entry`. Nonempty `RequestedJournalEntries: [int...]`; camelCase headers and `Details` lines. |
+
+Verified List arguments:
+
+| Argument | Input |
+|---|---|
+| `FilterByCompany` | Integer array |
+| `FilterByEarliestAccountingDate` | Inclusive ISO date, YYYY-MM-DD |
+| `FilterByLatestAccountingDate` | Inclusive ISO date, YYYY-MM-DD |
+| `FilterByBasis` | Scalar `Accrual`, `Cash`, or `Both`; omit for all categories |
+| `FilterByVoided` | Boolean true/false; omit for both statuses |
+
+`Both` selects that basis category, not every category. Invalid basis strings
+can return empty success responses, so the client validates them locally.
+Unrecognized filters can be silently ignored: do not substitute
+`FilterByEarliestDate`, `FilterByNameLike`, `FilterByDescriptionLike`,
+`FilterByReferenceLike`, `FilterByDescription`, `FilterByReference`, or
+`FilterByUnvoided` for the verified arguments.
+
+**Completeness:** an unfiltered request returned 500 records. Page size 2
+reported 250 pages; page 251 was empty. Page size 1000 still returned only
+500. An older accounting-date window retrieved older entries. Narrow date
+windows until each result has fewer than 500 entries, and partition a
+still-capped single day further or report unresolved completeness. The MCP
+list envelope flags `PossiblyTruncated` at 500 and includes a warning.
+
+List headers include `Journal Entry Key`, `Company Key`, `Accounting Date`,
+`Original Accounting Date`, `Basis Type`, `Description`, `Reference` and
+`Notes`; `Reversal Date` and `Is Voided` can be absent. Get headers include
+`JournalEntryKey`, `AccountingDate`, `CompanyKey`, `Reference`, `Description`,
+`Notes`, `Basis`, `IsVoided` and `Details`. Lines may include
+`JournalEntryDetailKey`, `GLAccountKey`, `GLAccountDescription`, `DepartmentKey`,
+`CompanyKey`, `Debit`, `Credit`, `Notes` and `AccountingDate`.
+
+Get responses contain large opaque snapshots that are stripped from read-only
+client output. Get requests are batched in groups of five, with duplicate
+input keys collapsed. Root response codes and negative errors are checked;
+a returned key set that differs from the requested set also fails. A batch
+with valid and invalid keys can contain partial data despite an error code;
+it is not accepted as a complete successful response.
+
+Some sampled entries lacked account/department identifiers. A voided sample
+had no visible lines. Get omitted reversal metadata present on List. Preserve
+List metadata and do not assume these methods replace every GL detail source.
 
 ---
 
@@ -339,6 +395,7 @@ write methods are intentionally excluded. Columns:
 | Expense Reports | 3 | 3 |
 | Fringes | 1 | 1 |
 | GL Accounts | 2 | 2 |
+| Journal Entries | 2 | 2 |
 | Invoice Formats | 1 | 1 |
 | Marketing Final Dispositions | 1 | 1 |
 | Marketing Stages | 1 | 1 |
@@ -356,7 +413,9 @@ write methods are intentionally excluded. Columns:
 | Vendor Types | 1 | 1 |
 | Vendors | 2 | 2 |
 | Wage Tables | 1 | 1 |
-| **Total** | **46** | **46** |
+| **Total** | **48** | **47** |
+
+The untested Attachment Categories method is listed but not implemented.
 
 ---
 

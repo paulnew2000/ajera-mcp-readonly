@@ -18,15 +18,19 @@ See README.md for setup instructions.
 
 import json
 import functools
+import logging
 from mcp.server.fastmcp import FastMCP
 from ajera_client import AjeraClient, AjeraError
+
+# HTTP INFO logs include the full API URL and its connection identifier.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 mcp = FastMCP(
     "Deltek Ajera",
     instructions=(
         "This server provides read-only access to Deltek Ajera, a project-based "
         "accounting and project management system. You can query projects, clients, "
-        "contacts, employees, timesheets, GL accounts, vendors, expense reports, "
+        "contacts, employees, timesheets, GL accounts, journal entries, vendors, expense reports, "
         "and all reference/lookup tables. "
         "Most list tools return summary data (keys + names) — use the corresponding "
         "get tool to retrieve full field detail. "
@@ -56,6 +60,8 @@ def _handle(fn):
             return fn(*args, **kwargs)
         except AjeraError as e:
             return f"Ajera API error: {e}"
+        except ValueError as e:
+            return f"Invalid request: {e}"
         except Exception as e:
             return f"Unexpected error: {e}"
     return wrapper
@@ -559,8 +565,8 @@ def get_gl_account_balances(
     Retrieve GL account details including current balances and budget amounts.
     Returns Amount, GLBalance, GLCashBasisBalance, and budget fields.
 
-    Note: GL transaction-level detail (individual journal entries) is not
-    exposed by the Ajera API — only balance snapshots are available.
+    For individual journal-entry lines, use list_journal_entries and
+    get_journal_entry. These balance methods do not return transactions.
 
     Args:
         gl_account_keys: Specific GLAccountKey values. Omit to return all.
@@ -579,6 +585,87 @@ def get_gl_account_balances(
         exclude_close_year_entries=exclude_close_year_entries,
     )
     return _fmt(results) if results else "No GL accounts found for the provided filters."
+
+
+# ===========================================================================
+# Journal Entries  (API v2; read-only)
+# ===========================================================================
+
+
+@mcp.tool()
+@_handle
+def list_journal_entries(
+    earliest_date: str = "",
+    latest_date: str = "",
+    company_keys: list[int] | None = None,
+    basis: str = "",
+    voided: bool | None = None,
+) -> str:
+    """
+    List journal-entry headers, including keys, dates, references and notes.
+    Use get_journal_entry for the debit/credit lines. Requires API v2 and
+    the List Journal Entries read permission.
+
+    At most 500 entries are returned, BEFORE API pagination. If
+    PossiblyTruncated is true, split the accounting-date range and query
+    again; paging cannot retrieve entries beyond the cap. Even a single
+    day may require partitioning by company, basis or void status.
+
+    Args:
+        earliest_date: Inclusive accounting date, YYYY-MM-DD; '' omits it.
+        latest_date: Inclusive accounting date, YYYY-MM-DD; '' omits it.
+        company_keys: Positive company keys; omit for all companies.
+        basis: 'Accrual', 'Cash', 'Both', or '' for all basis categories.
+            'Both' selects that category, not every category.
+        voided: True for voided, False for nonvoided, None for both statuses.
+    """
+    results = _get_client().list_journal_entries(
+        company_keys=company_keys,
+        earliest_date=earliest_date or None,
+        latest_date=latest_date or None,
+        basis=basis or None,
+        voided=voided,
+    )
+    output = {
+        "JournalEntries": results,
+        "ReturnedCount": len(results),
+        "Limit": 500,
+        "PossiblyTruncated": len(results) >= 500,
+    }
+    if len(results) >= 500:
+        output["Warning"] = (
+            "The API caps results at 500 before pagination. Split the accounting-date "
+            "range and deduplicate by Journal Entry Key; do not assume history is complete."
+        )
+    return _fmt(output)
+
+
+@mcp.tool()
+@_handle
+def get_journal_entry(journal_entry_keys: list[int]) -> str:
+    """
+    Retrieve journal-entry headers and debit/credit lines by positive keys.
+    Requires API v2 and the Get Journal Entries read permission. Requests
+    are batched in groups of five; errors are surfaced, not silently
+    accepted as complete partial results. Duplicate input keys are collapsed.
+
+    List returns space-separated field names; Get uses camelCase names.
+    Returned fields include JournalEntryKey, AccountingDate, Reference,
+    Description, Notes, Basis, CompanyKey, IsVoided, and Details. Lines may
+    include JournalEntryDetailKey, GLAccountKey, GLAccountDescription,
+    DepartmentKey, CompanyKey, Debit, Credit, Notes, and AccountingDate.
+
+    Opaque update snapshots are removed. Missing debit/credit sides mean
+    zero for arithmetic. Some entries may omit account/department fields;
+    voided entries may have no visible lines. Preserve reversal metadata
+    from List: it may not be returned by Get. These methods do not establish
+    complete coverage of all GL transaction sources.
+
+    Args:
+        journal_entry_keys: Nonempty list of positive Journal Entry Key
+            values returned by list_journal_entries.
+    """
+    return _fmt(_get_client().get_journal_entries(journal_entry_keys))
 
 
 # ===========================================================================
